@@ -23,11 +23,43 @@ def analyze_chain(
     for _, row in chain.iterrows():
         strike = float(row["strike"])
         bs = black_scholes(spot, strike, years, sigma, risk_free_rate)
-        put_mid = _mid(row.get("put_bid"), row.get("put_ask"), row.get("put_ltp"))
-        call_mid = _mid(row.get("call_bid"), row.get("call_ask"), row.get("call_ltp"))
+        put_market = _market_price(row.get("put_ltp"), row.get("put_bid"), row.get("put_ask"))
+        call_market = _market_price(row.get("call_ltp"), row.get("call_bid"), row.get("call_ask"))
 
-        rows.append(_build_row("CSP", symbol, spot, strike, put_mid, row, bs.put_value, bs.put_delta, bs.put_theta, dte, capital, lot_size, snapshot))
-        rows.append(_build_row("Covered Call", symbol, spot, strike, call_mid, row, bs.call_value, bs.call_delta, bs.call_theta, dte, capital, lot_size, snapshot))
+        rows.append(
+            _build_row(
+                "CSP",
+                symbol,
+                spot,
+                strike,
+                put_market,
+                row,
+                bs.put_value,
+                bs.put_delta,
+                bs.put_theta,
+                dte,
+                capital,
+                lot_size,
+                snapshot,
+            )
+        )
+        rows.append(
+            _build_row(
+                "Covered Call",
+                symbol,
+                spot,
+                strike,
+                call_market,
+                row,
+                bs.call_value,
+                bs.call_delta,
+                bs.call_theta,
+                dte,
+                capital,
+                lot_size,
+                snapshot,
+            )
+        )
 
     results = pd.DataFrame(rows).replace([np.inf, -np.inf], np.nan)
     results = results.dropna(subset=["market_price", "model_price"])
@@ -51,14 +83,31 @@ def analyze_chain(
 
 
 def _build_row(strategy, symbol, spot, strike, market_price, source, model_price, delta, theta, dte, capital, lot_size, snapshot):
-    spread = _spread_pct(source.get("put_bid" if strategy == "CSP" else "call_bid"), source.get("put_ask" if strategy == "CSP" else "call_ask"), market_price)
+    spread = _spread_pct(
+        source.get("put_bid" if strategy == "CSP" else "call_bid"),
+        source.get("put_ask" if strategy == "CSP" else "call_ask"),
+        market_price,
+    )
     premium = market_price * lot_size
     collateral = strike * lot_size if strategy == "CSP" else spot * lot_size
     annualized_return = (premium / collateral) * (365.0 / dte) * 100.0 if collateral > 0 else np.nan
     breakeven = strike - market_price if strategy == "CSP" else spot - market_price
     mispricing = market_price - model_price
     mispricing_pct = (mispricing / model_price * 100.0) if model_price > 0 else np.nan
-    score, reasons = _score_candidate(strategy, spot, strike, annualized_return, spread, delta, source, snapshot, capital, collateral, market_price, model_price)
+    score, reasons = _score_candidate(
+        strategy,
+        spot,
+        strike,
+        annualized_return,
+        spread,
+        delta,
+        source,
+        snapshot,
+        capital,
+        collateral,
+        market_price,
+        model_price,
+    )
 
     return {
         "symbol": symbol,
@@ -161,10 +210,42 @@ def _score_candidate(strategy, spot, strike, arr, spread, delta, source, snapsho
     return max(0, min(100, score)), reasons[:5]
 
 
-def _mid(bid, ask, ltp):
+def _market_price(ltp, bid, ask):
+    ltp = _num(ltp)
     bid = _num(bid)
     ask = _num(ask)
-    ltp = _num(ltp)
+
+    if np.isfinite(ltp) and ltp > 0:
+        return ltp
+    if np.isfinite(bid) and np.isfinite(ask) and bid > 0 and ask > 0:
+        return (bid + ask) / 2.0
+    return np.nan
+
+
+def _spread_pct(bid, ask, market):
+    bid = _num(bid)
+    ask = _num(ask)
+    market = _num(market)
+    if np.isfinite(bid) and np.isfinite(ask) and np.isfinite(market) and market > 0:
+        return ((ask - bid) / market) * 100.0
+    return np.nan
+
+
+def _num(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return np.nan
+
+
+def _recommendation(score: int) -> str:
+    if score >= 78:
+        return "Strong candidate"
+    if score >= 62:
+        return "Possible, review manually"
+    if score >= 45:
+        return "Wait / only if thesis is strong"
+    return "Avoid"
     if np.isfinite(bid) and np.isfinite(ask) and bid > 0 and ask > 0:
         return (bid + ask) / 2.0
     if np.isfinite(ltp) and ltp > 0:
