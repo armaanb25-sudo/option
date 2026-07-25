@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from .pricing import black_scholes
+from pricing import black_scholes
 
 
 def analyze_chain(
