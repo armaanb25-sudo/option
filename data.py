@@ -95,7 +95,7 @@ if _looks_like_nse_option_chain(raw, strike_col):
     normalized = normalized.dropna(subset=["strike"]).sort_values("strike").reset_index(drop=True)
     if normalized.empty:
         raise ValueError("No valid strike rows found after reading the CSV.")
-    return normalized
+        return normalized
 
     mappings = {
         "call_ltp": find("call ltp", "calls ltp", "ce ltp", "call_ltp", "ce_ltp", "ltp ce"),
