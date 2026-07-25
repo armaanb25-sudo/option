@@ -70,6 +70,10 @@ def normalize_option_chain(raw: pd.DataFrame) -> pd.DataFrame:
                 return lookup[cleaned]
         return None
 
+    strike_col = find("strike", "strike price", "strikeprice")
+if not strike_col:
+    raise ValueError("Could not find a strike column. Expected something like 'Strike' or 'Strike Price'.")
+    
     if _looks_like_nse_option_chain(raw, strike_col):
     normalized = pd.DataFrame(
         {
