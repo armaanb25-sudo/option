@@ -3,9 +3,8 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from wheel_analyzer.data import load_history, market_snapshot, normalize_option_chain, read_option_csv
-from wheel_analyzer.strategy import analyze_chain
-
+from data import load_history, market_snapshot, normalize_option_chain, read_option_csv
+from strategy import analyze_chain
 
 st.set_page_config(
     page_title="Wheel Strategy Analyzer",
