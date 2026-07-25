@@ -74,7 +74,7 @@ def normalize_option_chain(raw: pd.DataFrame) -> pd.DataFrame:
 if not strike_col:
     raise ValueError("Could not find a strike column. Expected something like 'Strike' or 'Strike Price'.")
     
-    if _looks_like_nse_option_chain(raw, strike_col):
+if _looks_like_nse_option_chain(raw, strike_col):
     normalized = pd.DataFrame(
         {
             "strike": _to_number(raw[strike_col]),
