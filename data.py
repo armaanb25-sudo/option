@@ -125,12 +125,14 @@ if not strike_col:
 def _clean_col(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", str(value).lower()).strip()
 
-
-def _to_number(series: Iterable) -> pd.Series:
-    return pd.to_numeric(pd.Series(series).astype(str).str.replace(",", "", regex=False).str.replace("%", "", regex=False), errors="coerce")
-    
 def _looks_like_nse_option_chain(raw: pd.DataFrame, strike_col: str) -> bool:
     return (
         strike_col == "STRIKE"
         and {"LTP", "BID", "ASK", "LTP.1", "BID.1", "ASK.1"}.issubset(set(raw.columns))
     )
+
+
+
+def _to_number(series: Iterable) -> pd.Series:
+    return pd.to_numeric(pd.Series(series).astype(str).str.replace(",", "", regex=False).str.replace("%", "", regex=False), errors="coerce")
+    
