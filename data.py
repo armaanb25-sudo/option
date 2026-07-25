@@ -51,6 +51,9 @@ def market_snapshot(history: pd.DataFrame) -> dict:
 
 def read_option_csv(content: bytes | str) -> pd.DataFrame:
     text = content.decode("utf-8-sig", errors="replace") if isinstance(content, bytes) else content
+    first_line = text.splitlines()[0].strip().upper() if text.splitlines() else ""
+    if first_line.startswith("CALLS"):
+        return pd.read_csv(StringIO(text), header=1)
     return pd.read_csv(StringIO(text))
 
 
@@ -67,9 +70,28 @@ def normalize_option_chain(raw: pd.DataFrame) -> pd.DataFrame:
                 return lookup[cleaned]
         return None
 
-    strike_col = find("strike", "strike price", "strikeprice")
-    if not strike_col:
-        raise ValueError("Could not find a strike column. Expected something like 'Strike' or 'Strike Price'.")
+    if _looks_like_nse_option_chain(raw, strike_col):
+    normalized = pd.DataFrame(
+        {
+            "strike": _to_number(raw[strike_col]),
+            "call_ltp": _to_number(raw.get("LTP")),
+            "call_bid": _to_number(raw.get("BID")),
+            "call_ask": _to_number(raw.get("ASK")),
+            "call_iv": _to_number(raw.get("IV")),
+            "call_oi": _to_number(raw.get("OI")),
+            "call_volume": _to_number(raw.get("VOLUME")),
+            "put_ltp": _to_number(raw.get("LTP.1")),
+            "put_bid": _to_number(raw.get("BID.1")),
+            "put_ask": _to_number(raw.get("ASK.1")),
+            "put_iv": _to_number(raw.get("IV.1")),
+            "put_oi": _to_number(raw.get("OI.1")),
+            "put_volume": _to_number(raw.get("VOLUME.1")),
+        }
+    )
+    normalized = normalized.dropna(subset=["strike"]).sort_values("strike").reset_index(drop=True)
+    if normalized.empty:
+        raise ValueError("No valid strike rows found after reading the CSV.")
+    return normalized
 
     mappings = {
         "call_ltp": find("call ltp", "calls ltp", "ce ltp", "call_ltp", "ce_ltp", "ltp ce"),
@@ -102,3 +124,9 @@ def _clean_col(value: str) -> str:
 
 def _to_number(series: Iterable) -> pd.Series:
     return pd.to_numeric(pd.Series(series).astype(str).str.replace(",", "", regex=False).str.replace("%", "", regex=False), errors="coerce")
+    
+def _looks_like_nse_option_chain(raw: pd.DataFrame, strike_col: str) -> bool:
+    return (
+        strike_col == "STRIKE"
+        and {"LTP", "BID", "ASK", "LTP.1", "BID.1", "ASK.1"}.issubset(set(raw.columns))
+    )
